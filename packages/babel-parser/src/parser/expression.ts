@@ -365,7 +365,25 @@ export default abstract class ExpressionParser extends LValParser {
       return expr;
     }
 
-    return this.parseConditional(expr, startLoc, refExpressionErrors);
+    const conditional = this.parseConditional(
+      expr,
+      startLoc,
+      refExpressionErrors,
+    );
+    if (conditional) {
+      return conditional;
+    }
+
+    const largeTernary = this.parseLargeTernary(
+      expr,
+      startLoc,
+      refExpressionErrors,
+    );
+    if (largeTernary) {
+      return largeTernary;
+    }
+
+    return expr;
   }
 
   parseConditional(
@@ -383,7 +401,60 @@ export default abstract class ExpressionParser extends LValParser {
       node.alternate = this.parseMaybeAssign();
       return this.finishNode(node, "ConditionalExpression");
     }
-    return expr;
+    return null;
+  }
+
+  parseLargeTernary(
+    this: Parser,
+    expr: N.Expression,
+    startLoc: Position,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    refExpressionErrors?: ExpressionErrors | null,
+  ): N.Expression {
+    if (this.eat(tt.questionAt)) {
+      const parseCase = () => {
+        const leftVal = this.parseExprOps(refExpressionErrors);
+        if (this.eat(tt.colon)) {
+          const rightVal = this.parseExprOps(refExpressionErrors);
+          return { caseValue: leftVal, resultValue: rightVal };
+        }
+        return { resultValue: leftVal };
+      };
+
+      const makeCaseComparison = (c: any) => {
+        const node = this.startNode<N.BinaryExpression>();
+        node.left = expr;
+        node.right = c.caseValue;
+        node.operator = "===";
+        return this.finishNode(node, "BinaryExpression");
+      };
+
+      const cases: any[] = [];
+      const makeConditional = (caseIndex: number) => {
+        const leftCase = cases[caseIndex];
+        const rightCase = cases[caseIndex + 1];
+        const node = this.startNode<N.ConditionalExpression>();
+        node.test = makeCaseComparison(leftCase);
+        node.consequent = leftCase.resultValue;
+        if (rightCase.caseValue === undefined) {
+          node.alternate = rightCase.resultValue;
+        } else {
+          node.alternate = makeConditional(caseIndex + 1);
+        }
+        return this.finishNode(node, "ConditionalExpression");
+      };
+
+      cases.push(parseCase());
+      this.expect(tt.question);
+
+      do {
+        cases.push(parseCase());
+      } while (this.eat(tt.question));
+
+      const conditional = makeConditional(0);
+      return conditional;
+    }
+    return null;
   }
 
   parseMaybeUnaryOrPrivate(

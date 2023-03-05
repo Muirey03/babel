@@ -811,6 +811,9 @@ export default abstract class Tokenizer extends CommentsParser {
       // '.' not followed by a number
       this.state.pos += 2;
       this.finishToken(tt.questionDot);
+    } else if (next === charCodes.atSign) {
+      this.state.pos += 2;
+      this.finishToken(tt.questionAt);
     } else {
       ++this.state.pos;
       this.finishToken(tt.question);

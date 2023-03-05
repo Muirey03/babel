@@ -345,6 +345,9 @@ export const tt = {
 
   // placeholder plugin
   placeholder: createToken("%%", { startsExpr: true }),
+
+  // large ternaries plugin
+  questionAt: createToken("?@", { beforeExpr }),
 } as const;
 
 export function tokenIsIdentifier(token: TokenType): boolean {
